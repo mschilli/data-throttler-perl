@@ -6,8 +6,10 @@
 use warnings;
 use strict;
 
-use Test::More qw(no_plan);
+use Test::More;
 use Data::Throttler;
+
+plan tests => 7;
 
 my $throttler = Data::Throttler->new(
     max_items => 2,
@@ -21,3 +23,12 @@ is($throttler->try_item(), 0, "3nd item");
 is($throttler->try_item(key => "foobar"), 1, "1st item (key)");
 is($throttler->try_item(key => "foobar"), 1, "2nd item (key)");
 is($throttler->try_item(key => "foobar"), 0, "3nd item (key)");
+
+$throttler = Data::Throttler->new(
+    max_items => 2,
+    interval  => 20,
+);
+
+$throttler->try_item() for (1..3);
+sleep(2);
+is($throttler->try_item(), 1, "1st item after sleep");

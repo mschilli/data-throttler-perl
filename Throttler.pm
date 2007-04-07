@@ -74,6 +74,8 @@ sub try_item {
     my $count = 1;
     $count = $options{count} if defined $options{count};
 
+    $self->buckets_rotate();
+
     foreach my $b (reverse @{$self->{buckets}}) {
         next unless $b->{time}->member($time);
         if(defined $b->{count}->{$key} and
@@ -85,7 +87,31 @@ sub try_item {
         }
     }
 
-    LOGDIE "We shouldn't be here ($key $time $count)";
+    LOGDIE "Time $time is outside of bucket range\n", 
+           $self->buckets_dump;
+}
+
+###########################################
+sub buckets_rotate {
+###########################################
+    my($self) = @_;
+
+    my $time = time();
+
+    while($time > $self->{buckets}->[-1]->{time}->max) {
+
+          # Dump the oldest bucket ...
+        shift @{$self->{buckets}};
+
+          # ... and append a new one at the end
+        my $time_start = $self->{buckets}->[-1]->{time}->max + 1;
+        my $time_end   = $time_start + $self->{bucket_time_span} - 1;
+
+        push @{$self->{buckets}}, {
+               time  => Set::IntSpan->new("$time_start-$time_end"),
+               count => {}
+        };
+    }
 }
 
 ###########################################
