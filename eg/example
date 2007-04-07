@@ -16,11 +16,11 @@ my $throttler = Data::Throttler->new(
 );
 
 print $throttler->buckets_dump();
-$throttler->try_item(key => "foobar");
-$throttler->try_item(key => "foobar");
-$throttler->try_item(key => "barfoo");
+$throttler->try_push(key => "foobar");
+$throttler->try_push(key => "foobar");
+$throttler->try_push(key => "barfoo");
 print $throttler->buckets_dump();
 sleep(3);
-$throttler->try_item(key => "foobar");
-$throttler->try_item(key => "barfoo");
+$throttler->try_push(key => "foobar");
+$throttler->try_push(key => "barfoo");
 print $throttler->buckets_dump();

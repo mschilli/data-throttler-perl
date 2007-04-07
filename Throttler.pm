@@ -61,7 +61,7 @@ sub reset {
 }
 
 ###########################################
-sub try_item {
+sub try_push {
 ###########################################
     my($self, %options) = @_;
 
@@ -166,7 +166,7 @@ Data::Throttler - Limit data throughput
         interval  => 3600,
     );
 
-    if($throttler->try_item()) {
+    if($throttler->try_push()) {
         print "Item can be pushed\n";
     } else {
         print "Item needs to wait\n";
@@ -180,7 +180,7 @@ Data::Throttler - Limit data throughput
         db_file   => "/tmp/mythrottle.dat",
     );
 
-    if($throttler->try_item(key => "somekey")) {
+    if($throttler->try_push(key => "somekey")) {
         print "Item can be pushed\n";
     }
 
@@ -216,7 +216,7 @@ In the simplest case, C<Data::Throttler> just keeps track of single
 events. It allows a certain number of events per time frame to succeed
 and it recommends to block the rest:
 
-    if($throttler->try_item()) {
+    if($throttler->try_push()) {
         print "Item can be pushed\n";
     } else {
         print "Item needs to wait\n";
@@ -225,7 +225,7 @@ and it recommends to block the rest:
 When throttling different categories of items, like attempts to send
 emails by IP address of the sender, a key can be used:
 
-    if($throttler->try_item( key => "192.168.0.1" )) {
+    if($throttler->try_push( key => "192.168.0.1" )) {
         print "Item can be pushed\n";
     } else {
         print "Item needs to wait\n";
@@ -287,7 +287,7 @@ it yourself:
 Mainly for debugging and testing purposes, you can specify a different
 time than I<now> when trying to push an item:
 
-    if($throttler->try_item(
+    if($throttler->try_push(
           key  => "somekey",
           time => time() - 600 )) {
         print "Item can be pushed in the past\n";
@@ -304,9 +304,9 @@ each bucket. So the code
         max_items => 10,
     );
 
-    $throttler->try_item(key => "foobar");
-    $throttler->try_item(key => "foobar");
-    $throttler->try_item(key => "barfoo");
+    $throttler->try_push(key => "foobar");
+    $throttler->try_push(key => "foobar");
+    $throttler->try_push(key => "barfoo");
     print $throttler->buckets_dump();
 
 will print out something like
