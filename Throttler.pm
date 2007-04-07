@@ -6,6 +6,7 @@ use warnings;
 use Log::Log4perl qw(:easy);
 use Set::IntSpan;
 use Text::ASCIITable;
+use DBM::Deep;
 
 our $VERSION = "0.01";
 
@@ -16,10 +17,35 @@ sub new {
 
     my $self = {
         %options,
+        db_fields => [qw(buckets bucket_time_span 
+                        nof_buckets max_items interval)],
     };
 
     bless $self, $class;
-    $self->reset();
+
+    if($self->{db_file}) {
+
+        my $create;
+
+        if(! -f $self->{db_file}) {
+            $create = 1;
+        }
+
+        $self->{db} = DBM::Deep->new(
+            file      => $self->{db_file},
+            autoflush => 1,
+            locking   => 1,
+        );
+
+        if($create) {
+            $self->reset();
+            $self->save();
+        } else {
+            $self->restore();
+        }
+    } else {
+        $self->reset();
+    }
 
     return $self;
 }
@@ -61,6 +87,32 @@ sub reset {
 }
 
 ###########################################
+sub save {
+###########################################
+    my($self) = @_;
+
+    my $data = {};
+
+    for my $field (@{$self->{db_fields}}) {
+        $data->{$field} = $self->{$field};
+    }
+
+    $self->{db}->put(data => $data);
+}
+
+###########################################
+sub restore {
+###########################################
+    my($self) = @_;
+
+    my $data = $self->{db}->get("data");
+
+    for my $field (@{$self->{db_fields}}) {
+        $self->{$field} =  $data->{$field};
+    }
+}
+
+###########################################
 sub try_push {
 ###########################################
     my($self, %options) = @_;
@@ -74,21 +126,39 @@ sub try_push {
     my $count = 1;
     $count = $options{count} if defined $options{count};
 
+    if($self->{db}) {
+        $self->{db}->lock();
+        $self->restore();
+    }
+
     $self->buckets_rotate();
+
+    my $result;
 
     foreach my $b (reverse @{$self->{buckets}}) {
         next unless $b->{time}->member($time);
         if(defined $b->{count}->{$key} and
            $b->{count}->{$key} == $self->{max_items}) {
-            return 0;
+            $result = 0;
+            last;
         } else {
             $b->{count}->{$key} += $count;
-            return 1;
+            $result = 1;
+            last;
         }
     }
 
-    LOGDIE "Time $time is outside of bucket range\n", 
-           $self->buckets_dump;
+    if($self->{db}) {
+        $self->save();
+        $self->{db}->unlock();
+    }
+
+    if(! defined $result) {
+        LOGDIE "Time $time is outside of bucket range\n", 
+               $self->buckets_dump;
+    }
+
+    return $result;
 }
 
 ###########################################
