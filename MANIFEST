@@ -1,0 +1,8 @@
+Changes
+eg/example
+Makefile.PL
+MANIFEST			This list of files
+MANIFEST.SKIP
+README
+t/001Basic.t
+Throttler.pm

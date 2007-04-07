@@ -1,0 +1,10 @@
+#!/usr/bin/perl
+use warnings;
+use strict;
+
+    # Available at http://perlmeister.com/scripts
+use ModDevUtils;
+
+ModDevUtils::release() or exit 0;
+
+my $ball = ModDevUtils::tarball_name();
