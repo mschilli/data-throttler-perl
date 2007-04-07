@@ -1,0 +1,24 @@
+######################################################################
+    Throttle 0.01
+######################################################################
+
+NAME
+    Throttle - blah blah blah
+
+SYNOPSIS
+        use Throttle;
+
+DESCRIPTION
+    Throttle blah blah blah.
+
+EXAMPLES
+      $ perl -MThrottle -le 'print $foo'
+
+LEGALESE
+    Copyright 2007 by Mike Schilli, all rights reserved. This program is
+    free software, you can redistribute it and/or modify it under the same
+    terms as Perl itself.
+
+AUTHOR
+    2007, Mike Schilli <cpan@perlmeister.com>
+
