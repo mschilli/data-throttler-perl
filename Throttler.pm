@@ -20,6 +20,8 @@ sub new {
     };
 
     $self->{db_file} = $options{db_file} if defined $options{db_file};
+    $self->{lock}    = sub { };
+    $self->{unlock}  = sub { };
 
     bless $self, $class;
 
@@ -50,34 +52,55 @@ sub new {
     }
 
     if($create) {
+        $self->{lock}->();
         $self->{db}->{chain} = Data::Throttler::BucketChain->new(
             max_items => $options{max_items},
             interval  => $options{interval},
         );
+        $self->{unlock}->();
     }
 
     return $self;
 }
 
 ###########################################
+sub lock {
+###########################################
+    my($self) = @_;
+    $self->{lock}->();
+}
+
+###########################################
+sub unlock {
+###########################################
+    my($self) = @_;
+    $self->{unlock}->();
+}
+
+###########################################
 sub try_push {
 ###########################################
     my($self, %options) = @_;
-    return $self->{db}->{chain}->try_push(%options);
+    $self->lock();
+    my $ret = $self->{db}->{chain}->try_push(%options);
+    $self->unlock();
+    return $ret;
 }
 
 ###########################################
 sub buckets_dump {
 ###########################################
     my($self) = @_;
-    return $self->{db}->{chain}->as_string();
+    my $ret = $self->{db}->{chain}->as_string();
+    return $ret;
 }
 
 ###########################################
 sub buckets_rotate {
 ###########################################
     my($self) = @_;
-    return $self->{db}->{chain}->rotate();
+    my $ret = $self->{db}->{chain}->rotate();
+    return $ret;
 }
 
 package Data::Throttler::Range;
@@ -446,7 +469,7 @@ internal data structures in memory:
     );
 
 However, if the data structures need to be maintained across different
-invokations of a script or several instances of scripts using the
+invocations of a script or several instances of scripts using the
 throttler, using a persistent database is required:
 
       # persistent throttler
