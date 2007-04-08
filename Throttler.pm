@@ -91,7 +91,9 @@ sub try_push {
 sub buckets_dump {
 ###########################################
     my($self) = @_;
+    $self->lock();
     my $ret = $self->{db}->{chain}->as_string();
+    $self->unlock();
     return $ret;
 }
 
@@ -518,7 +520,7 @@ buckets and maintains counters in each bucket:
 To decide whether to allow a new event to happen or not, C<Data::Throttler>
 adds up all counters (3+7+4+1 = 15) and then compares the result 
 to the defined threshold. If the event is allowed, the corresponding 
-counter is increased:
+counter is increased (last column):
 
     1 hour ago                     Now
       +-----------------------------+
@@ -534,6 +536,24 @@ for new data. 10 minutes later, the bucket layout would look like this:
       | 7  | 0  | 0  | 4  | 2  | 0  |
       +-----------------------------+
        4:20 4:30 4:40 4:50 5:00 5:10
+
+=head2 LOCKING
+
+When used with a persistent data store, C<Data::Throttler> protects
+competing applications from clobbering the database by using the locking
+mechanism offered with C<DBM::Deep>. Both the C<try_push()> and the
+C<buckets_dump> function already perform locking behind the scenes.
+
+If you see a need to lock the data store yourself, i.e. when trying to 
+push counters for several keys simultaneously, use
+
+    $throttler->lock();
+
+and
+
+    $throttler->unlock();
+
+to protect the data store against competing applications.
 
 =head2 ADVANCED USAGE
 
@@ -564,7 +584,7 @@ Speaking of debugging, there's a utility method C<buckets_dump> which
 returns a string containing a formatted representation of what's in
 each bucket. So the code
 
-    use Throttler;
+    use Data::Throttler;
     
     my $throttler = Data::Throttler->new(
         interval  => 3600,
@@ -578,21 +598,21 @@ each bucket. So the code
 
 will print out something like
 
-    .---------------------+--------+-------.
-    | Time                | Key    | Count |
-    |=--------------------+--------+------=|
-    | 11:05:54 - 11:11:53 |        |       |
-    | 11:11:54 - 11:17:53 |        |       |
-    | 11:17:54 - 11:23:53 |        |       |
-    | 11:23:54 - 11:29:53 |        |       |
-    | 11:29:54 - 11:35:53 |        |       |
-    | 11:35:54 - 11:41:53 |        |       |
-    | 11:41:54 - 11:47:53 |        |       |
-    | 11:47:54 - 11:53:53 |        |       |
-    | 11:53:54 - 11:59:53 |        |       |
-    | 11:59:54 - 12:05:53 | barfoo |     1 |
-    |                     | foobar |     2 |
-    '---------------------+--------+-------'
+    .----+-----+---------------------+--------+-------.
+    | #  | idx | Time: 14:43:00      | Key    | Count |
+    |=---+-----+---------------------+--------+------=|
+    |  1 |   0 | 13:49:00 - 13:54:59 |        |       |
+    |  2 |   1 | 13:55:00 - 14:00:59 |        |       |
+    |  3 |   2 | 14:01:00 - 14:06:59 |        |       |
+    |  4 |   3 | 14:07:00 - 14:12:59 |        |       |
+    |  5 |   4 | 14:13:00 - 14:18:59 |        |       |
+    |  6 |   5 | 14:19:00 - 14:24:59 |        |       |
+    |  7 |   6 | 14:25:00 - 14:30:59 |        |       |
+    |  8 |   7 | 14:31:00 - 14:36:59 |        |       |
+    |  9 |   8 | 14:37:00 - 14:42:59 |        |       |
+    | 10 |   9 | 14:43:00 - 14:48:59 | barfoo |     1 |
+    |    |     |                     | foobar |     2 |
+    '----+-----+---------------------+--------+-------'
 
 and allow for further investigation.
 
