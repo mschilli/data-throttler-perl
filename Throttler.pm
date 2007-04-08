@@ -500,7 +500,7 @@ emails by IP address of the sender, a key can be used:
         print "Item needs to wait\n";
     }
 
-In this case, each key will be tracked seperately, even if the quota
+In this case, each key will be tracked separately, even if the quota
 for one key is maxed out, other keys will still succeed until their
 quota is reached.
 

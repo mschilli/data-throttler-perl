@@ -79,7 +79,7 @@ DESCRIPTION
             print "Item needs to wait\n";
         }
 
-    In this case, each key will be tracked seperately, even if the quota for
+    In this case, each key will be tracked separately, even if the quota for
     one key is maxed out, other keys will still succeed until their quota is
     reached.
 
