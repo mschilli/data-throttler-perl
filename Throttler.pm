@@ -37,6 +37,17 @@ sub new {
         );
         $self->{lock}   = sub { $self->{db}->lock() };
         $self->{unlock} = sub { $self->{db}->unlock() };
+
+        if($self->{db}->{chain} and
+           ($self->{db}->{chain}->{max_items} != $options{max_items} or
+            $self->{db}->{chain}->{interval} != $options{interval})) {
+            ERROR "Bucket chain parameters have changed ",
+                  "(max_items: $self->{db}->{chain}->{max_items}/",
+                  "$options{max_items} ",
+                  "(interval: $self->{db}->{chain}->{interval}/",
+                  "$options{interval})", ", throwing old chain away";
+            $create = 1;
+        }
     }
 
     if($create) {
@@ -61,6 +72,13 @@ sub buckets_dump {
 ###########################################
     my($self) = @_;
     return $self->{db}->{chain}->as_string();
+}
+
+###########################################
+sub buckets_rotate {
+###########################################
+    my($self) = @_;
+    return $self->{db}->{chain}->rotate();
 }
 
 package Data::Throttler::Range;
@@ -284,7 +302,7 @@ sub rotate {
     }
 
       # If we're too far off, just dump all buckets and re-init
-    if($self->{buckets}->[ $self->{head_bucket_idx} ]->{time}->min <
+    if($self->{buckets}->[ $self->{tail_bucket_idx} ]->{time}->max <
        $time - $self->{interval}) {
         DEBUG "Too far off, resetting (", hms($time), " >> ",
               hms($self->{buckets}->[ $self->{head_bucket_idx} ]->{time}->min),
