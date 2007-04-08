@@ -1,5 +1,6 @@
 Changes
 eg/example
+eg/persist
 Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
