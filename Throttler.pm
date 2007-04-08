@@ -371,7 +371,12 @@ sub try_push {
        $b = $self->bucket_find($time);
     }
 
-    my $val = ($b->{count}->{$key} || 0);
+    # Determine the total count for this key
+    my $val = 0;
+    for(0..$#{$self->{buckets}}) {
+        $val += $self->{buckets}->[$_]->{count}->{$key} if
+                exists $self->{buckets}->[$_]->{count}->{$key};
+    }
 
     if($val >= $self->{max_items}) {
         DEBUG "Not increasing counter $key by $count (already at max)";
