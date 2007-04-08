@@ -4,9 +4,9 @@ package Data::Throttler;
 use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
-use Set::IntSpan;
 use Text::ASCIITable;
 use DBM::Deep;
+use Storable qw(freeze thaw);
 
 our $VERSION    = "0.01";
 our $DB_VERSION = "1.0";
@@ -17,247 +17,62 @@ sub new {
     my($class, %options) = @_;
 
     my $self = {
-        %options,
         db_version => $DB_VERSION,
-        db_fields  => [qw(db_version buckets bucket_time_span 
-                          nof_buckets max_items interval)],
     };
+
+    $self->{db_file} = $options{db_file} if defined $options{db_file};
 
     bless $self, $class;
 
+    my $create = 1;
+
     if($self->{db_file}) {
-
-        my $create;
-
-        if(! -f $self->{db_file}) {
-            $create = 1;
+        if(-f $self->{db_file}) {
+            $create = 0;
         }
-
         $self->{db} = DBM::Deep->new(
             file      => $self->{db_file},
             autoflush => 1,
             locking   => 1,
         );
+        $self->{lock}   = sub { $self->{db}->lock() };
+        $self->{unlock} = sub { $self->{db}->unlock() };
+    }
 
-        if($create) {
-            $self->reset();
-            $self->save();
-        } else {
-            $self->restore();
-        }
-    } else {
-        $self->reset();
+    if($create) {
+        $self->{db}->{chain} = Data::Throttler::BucketChain->new(
+            max_items => $options{max_items},
+            interval  => $options{interval},
+        );
     }
 
     return $self;
 }
 
 ###########################################
-sub reset {
-###########################################
-    my($self) = @_;
-
-    if(!$self->{max_items} or
-       !$self->{interval}) {
-        LOGDIE "Both max_items and interval need to be defined";
-    }
-
-    if(!$self->{nof_buckets}) {
-        $self->{nof_buckets} = 10;
-    }
-
-    if($self->{nof_buckets} > $self->{interval}) {
-        $self->{nof_buckets} = $self->{interval};
-    }
-
-    $self->{buckets} = [];
-    my $bucket_time_span = int ($self->{interval} / $self->{nof_buckets});
-
-    $self->{bucket_time_span} = $bucket_time_span;
-
-    my $time_start = time() -
-        ($self->{nof_buckets}-1) * $bucket_time_span;
-
-    for(1..$self->{nof_buckets}) {
-        my $time_end = $time_start + $bucket_time_span - 1;
-        push @{$self->{buckets}}, { 
-            time  => Set::IntSpan->new("$time_start-$time_end"),
-            count => {},
-        };
-        $time_start = $time_end + 1;
-    }
-}
-
-###########################################
-sub save {
-###########################################
-    my($self) = @_;
-
-    DEBUG "Saving to $self->{db_file}";
-
-    my $data = {};
-
-    for my $field (@{$self->{db_fields}}) {
-        $data->{$field} = $self->{$field};
-    }
-
-      # Data::Deep can't handle Set::IntSpan objects
-    $data->{buckets} = [];
-    for my $b (@{$self->{buckets}}) {
-        push @{$data->{buckets}}, {
-            count => $b->{count},
-            time  => $b->{time}->run_list(),
-        };
-    }
-
-    $self->{db}->put(data => $data);
-}
-
-###########################################
-sub restore {
-###########################################
-    my($self) = @_;
-
-    DEBUG "Restoring from $self->{db_file}";
-
-    my $data = $self->{db}->get("data");
-
-    for my $field (@{$self->{db_fields}}) {
-        $self->{$field} =  $data->{$field};
-    }
-
-    $self->{buckets} = [];
-
-      # Data::Deep can't handle Set::IntSpan objects
-    for my $b (@{$data->{buckets}}) {
-        push @{$self->{buckets}}, {
-            count => { %{$b->{count}} },
-            time  => Set::IntSpan->new($b->{time}),
-        };
-    }
-}
-
-###########################################
 sub try_push {
 ###########################################
     my($self, %options) = @_;
-
-    my $key = "_default";
-    $key = $options{key} if defined $options{key};
-
-    my $time = time();
-    $time = $options{time} if defined $options{time};
-
-    my $count = 1;
-    $count = $options{count} if defined $options{count};
-
-    DEBUG "Trying to push $key $time $count";
-
-    if($self->{db}) {
-        $self->{db}->lock();
-        $self->restore();
-    }
-
-    $self->buckets_rotate();
-
-    my $result;
-
-    foreach my $b (reverse @{$self->{buckets}}) {
-        next unless $b->{time}->member($time);
-        $b->{count}->{$key} ||= 0;
-        if($b->{count}->{$key} >= $self->{max_items}) {
-            DEBUG "Not increasing counter $key by $count (already at max)";
-            $result = 0;
-            last;
-        } else {
-            DEBUG "Increasing counter $key by $count ",
-                  "($b->{count}->{$key}|$self->{max_items})";
-            $b->{count}->{$key} += $count;
-            $result = 1;
-            last;
-        }
-    }
-
-    if($self->{db}) {
-        $self->save();
-        $self->{db}->unlock();
-    }
-
-    if(! defined $result) {
-        LOGDIE "Time $time is outside of bucket range\n", 
-               $self->buckets_dump;
-    }
-
-    return $result;
-}
-
-###########################################
-sub buckets_rotate {
-###########################################
-    my($self) = @_;
-
-    my $time = time();
-
-    while($time > $self->{buckets}->[-1]->{time}->max) {
-
-          # Dump the oldest bucket ...
-        shift @{$self->{buckets}};
-
-          # ... and append a new one at the end
-        my $time_start = $self->{buckets}->[-1]->{time}->max + 1;
-        my $time_end   = $time_start + $self->{bucket_time_span} - 1;
-
-        push @{$self->{buckets}}, {
-               time  => Set::IntSpan->new("$time_start-$time_end"),
-               count => {}
-        };
-    }
+    return $self->{db}->{chain}->try_push(%options);
 }
 
 ###########################################
 sub buckets_dump {
 ###########################################
     my($self) = @_;
-
-    my $t = Text::ASCIITable->new();
-    $t->setCols("Time", "Key", "Count");
-
-    foreach my $b (@{$self->{buckets}}) {
-        my $span = hms($b->{time}->min) . " - " . hms($b->{time}->max);
-
-        if(! scalar keys %{$b->{count}}) {
-            $t->addRow($span, "", "");
-        }
-
-        foreach my $key (sort keys %{$b->{count}}) {
-            $t->addRow($span, $key, $b->{count}->{$key});
-            $span = "";
-        }
-    }
-    return $t->draw();
+    return $self->{db}->{chain}->as_string();
 }
 
-###########################################
-sub hms {
-###########################################
-    my($time) = @_;
-
-    my ($sec,$min,$hour) = localtime($time);
-    return sprintf "%02d:%02d:%02d", 
-           $hour, $min, $sec;
-}
-
-package Data::Throttle::Range;
+package Data::Throttler::Range;
 
 ###########################################
 sub new {
 ###########################################
-    my($class, @options) = @_;
+    my($class, $start, $stop) = @_;
 
     my $self = {
-        start => undef,
-        stop  => undef,
-        @options,
+        start => $start,
+        stop  => $stop,
     };
     bless $self, $class;
 }
@@ -282,6 +97,276 @@ sub member {
     my($self, $time) = @_;
 
     return ($time >= $self->{start} and $time <= $self->{stop});
+}
+
+###########################################
+package Data::Throttler::BucketChain;
+###########################################
+use Log::Log4perl qw(:easy);
+use Text::ASCIITable;
+
+###########################################
+sub new {
+###########################################
+    my($class, %options) = @_;
+
+    my $self = {
+        max_items => undef,
+        interval  => undef,
+        %options,
+    };
+
+    if(!$self->{max_items} or
+       !$self->{interval}) {
+        LOGDIE "Both max_items and interval need to be defined";
+    }
+
+    if(!$self->{nof_buckets}) {
+        $self->{nof_buckets} = 10;
+    }
+
+    if($self->{nof_buckets} > $self->{interval}) {
+        $self->{nof_buckets} = $self->{interval};
+    }
+
+    bless $self, $class;
+
+    $self->reset();
+
+    return $self;
+}
+
+###########################################
+sub reset {
+###########################################
+    my($self) = @_;
+
+    $self->{buckets} = [];
+
+    my $bucket_time_span = int ($self->{interval} / 
+                                $self->{nof_buckets});
+
+    $self->{bucket_time_span} = $bucket_time_span;
+
+    my $time_start = time() -
+        ($self->{nof_buckets}-1) * $bucket_time_span;
+
+    for(1..$self->{nof_buckets}) {
+        my $time_end = $time_start + $bucket_time_span - 1;
+        DEBUG "Creating bucket ", hms($time_start), " - ", hms($time_end);
+        push @{$self->{buckets}}, { 
+            time  => Data::Throttler::Range->new($time_start, $time_end),
+            count => {},
+        };
+        $time_start = $time_end + 1;
+    }
+
+    $self->{head_bucket_idx} = 0;
+    $self->{tail_bucket_idx} = $#{$self->{buckets}};
+}
+
+###########################################
+sub first_bucket {
+###########################################
+    my($self) = @_;
+
+    $self->{current_idx} = $self->{head_bucket_idx};
+    return $self->{buckets}->[ $self->{current_idx} ];
+}
+
+###########################################
+sub last_bucket {
+###########################################
+    my($self) = @_;
+
+    $self->{current_idx} = $self->{tail_bucket_idx};
+    return $self->{buckets}->[ $self->{current_idx} ];
+}
+
+###########################################
+sub next_bucket {
+###########################################
+    my($self) = @_;
+
+    return undef if $self->{current_idx} == $self->{tail_bucket_idx};
+
+    $self->{current_idx}++;
+    $self->{current_idx} = 0 if $self->{current_idx} > $#{$self->{buckets}};
+
+    return $self->{buckets}->[ $self->{current_idx} ];
+}
+
+###########################################
+sub as_string {
+###########################################
+    my($self) = @_;
+
+    my $t = Text::ASCIITable->new();
+    $t->setCols("#", "idx", ("Time: " . hms(time)), "Key", "Count");
+
+    my $count = 1;
+
+    for(my $b = $self->first_bucket(); $b; $b = $self->next_bucket()) {
+        my $span = hms($b->{time}->min) . " - " . hms($b->{time}->max);
+        my $idx  = $self->{current_idx};
+        my $count_string = $count;
+
+        if(! scalar keys %{$b->{count}}) {
+            $t->addRow($count_string, $idx, $span, "", "");
+        }
+
+        foreach my $key (sort keys %{$b->{count}}) {
+            $t->addRow($count_string, $idx, $span, $key, $b->{count}->{$key});
+            $span = "";
+            $count_string = "";
+            $idx = "";
+        }
+
+        $count++;
+    }
+    return $t->draw();
+}
+
+###########################################
+sub hms {
+###########################################
+    my($time) = @_;
+
+    my ($sec,$min,$hour) = localtime($time);
+    return sprintf "%02d:%02d:%02d", 
+           $hour, $min, $sec;
+}
+
+###########################################
+sub bucket_add {
+###########################################
+    my($self, $time) = @_;
+
+      # ... and append a new one at the end
+    my $time_start = $self->{buckets}->
+                      [$self->{tail_bucket_idx}]->{time}->max + 1;
+    my $time_end   = $time_start + $self->{bucket_time_span} - 1;
+
+    DEBUG "Adding bucket: ", hms($time_start), " - ", hms($time_end);
+
+    $self->{tail_bucket_idx}++;
+    $self->{tail_bucket_idx} = 0 if $self->{tail_bucket_idx} >
+                                    $#{$self->{buckets}};
+    $self->{head_bucket_idx}++;
+    $self->{head_bucket_idx} = 0 if $self->{head_bucket_idx} >
+                                    $#{$self->{buckets}};
+
+    $self->{buckets}->[ $self->{tail_bucket_idx} ] = { 
+          time  => Data::Throttler::Range->new($time_start, $time_end),
+          count => {},
+    };
+}
+
+###########################################
+sub rotate {
+###########################################
+    my($self, $time) = @_;
+    $time = time() unless defined $time;
+
+    # If the last bucket handles a time interval that doesn't cover
+    # $time, we need to rotate the bucket brigade. The first bucket
+    # will be cleared and re-used as the new last bucket of the chain.
+
+    DEBUG "Rotating buckets time=", hms($time), " ", 
+          "head=", $self->{head_bucket_idx};
+
+    if($self->last_bucket->{time}->{stop} >= $time) {
+        # $time is still covered in the bucket brigade, we're golden
+        DEBUG "Rotation not necessary (", 
+              hms($self->last_bucket->{time}->{stop}),
+              " - ", hms($time), ")";
+        return 1;
+    }
+
+      # If we're too far off, just dump all buckets and re-init
+    if($self->{buckets}->[ $self->{head_bucket_idx} ]->{time}->min <
+       $time - $self->{interval}) {
+        DEBUG "Too far off, resetting (", hms($time), " >> ",
+              hms($self->{buckets}->[ $self->{head_bucket_idx} ]->{time}->min),
+              ")";
+        $self->reset();
+        return 1;
+    }
+
+    while($self->last_bucket()->{time}->min <= $time) {
+        $self->bucket_add();
+    }
+
+    DEBUG "After rotation: ",
+          hms($self->{buckets}->[ $self->{head_bucket_idx} ]->{time}->min),
+          " - ",
+          hms($self->{buckets}->[ $self->{tail_bucket_idx} ]->{time}->max),
+          " (covers ", hms($time), ")";
+}
+
+###########################################
+sub bucket_find {
+###########################################
+    my($self, $time) = @_;
+
+    DEBUG "Searching bucket for time=", hms($time);
+
+        # Search in the newest bucket first, chances are it's there
+    my $last_bucket = $self->last_bucket();
+    if($last_bucket->{time}->member($time)) {
+        DEBUG hms($time), " covered by last bucket";
+        return $last_bucket;
+    }
+
+    for(my $b = $self->first_bucket(); $b; $b = $self->next_bucket()) {
+        if($b->{time}->member($time)) {
+            DEBUG "Found bucket ", hms($b->{time}->min), 
+                  " - ", hms($b->{time}->max);
+            return $b;
+        }
+    }
+
+    DEBUG "No bucket found for time=", hms($time);
+    return undef;
+}
+
+###########################################
+sub try_push {
+###########################################
+    my($self, %options) = @_;
+
+    my $key = "_default";
+    $key = $options{key} if defined $options{key};
+
+    my $time = time();
+    $time = $options{time} if defined $options{time};
+
+    my $count = 1;
+    $count = $options{count} if defined $options{count};
+
+    DEBUG "Trying to push $key ", hms($time), " $count";
+
+    my $b = $self->bucket_find($time);
+
+    if(!$b) {
+       $self->rotate($time);
+       $b = $self->bucket_find($time);
+    }
+
+    my $val = ($b->{count}->{$key} || 0);
+
+    if($val >= $self->{max_items}) {
+        DEBUG "Not increasing counter $key by $count (already at max)";
+        return 0;
+    } else {
+        DEBUG "Increasing counter $key by $count ",
+              "($val|$self->{max_items})";
+        $b->{count}->{$key} = $val + $count;
+        return 1;
+    }
+
+    LOGDIE "Time $time is outside of bucket range\n", $self->as_string;
+    return undef;
 }
 
 1;
