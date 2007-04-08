@@ -6,7 +6,6 @@ use warnings;
 use Log::Log4perl qw(:easy);
 use Text::ASCIITable;
 use DBM::Deep;
-use Storable qw(freeze thaw);
 
 our $VERSION    = "0.01";
 our $DB_VERSION = "1.0";
