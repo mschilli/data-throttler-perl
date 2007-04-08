@@ -8,7 +8,8 @@ use Set::IntSpan;
 use Text::ASCIITable;
 use DBM::Deep;
 
-our $VERSION = "0.01";
+our $VERSION    = "0.01";
+our $DB_VERSION = "1.0";
 
 ###########################################
 sub new {
@@ -17,8 +18,9 @@ sub new {
 
     my $self = {
         %options,
-        db_fields => [qw(buckets bucket_time_span 
-                        nof_buckets max_items interval)],
+        db_version => $DB_VERSION,
+        db_fields  => [qw(db_version buckets bucket_time_span 
+                          nof_buckets max_items interval)],
     };
 
     bless $self, $class;
@@ -91,10 +93,21 @@ sub save {
 ###########################################
     my($self) = @_;
 
+    DEBUG "Saving to $self->{db_file}";
+
     my $data = {};
 
     for my $field (@{$self->{db_fields}}) {
         $data->{$field} = $self->{$field};
+    }
+
+      # Data::Deep can't handle Set::IntSpan objects
+    $data->{buckets} = [];
+    for my $b (@{$self->{buckets}}) {
+        push @{$data->{buckets}}, {
+            count => $b->{count},
+            time  => $b->{time}->run_list(),
+        };
     }
 
     $self->{db}->put(data => $data);
@@ -105,10 +118,22 @@ sub restore {
 ###########################################
     my($self) = @_;
 
+    DEBUG "Restoring from $self->{db_file}";
+
     my $data = $self->{db}->get("data");
 
     for my $field (@{$self->{db_fields}}) {
         $self->{$field} =  $data->{$field};
+    }
+
+    $self->{buckets} = [];
+
+      # Data::Deep can't handle Set::IntSpan objects
+    for my $b (@{$data->{buckets}}) {
+        push @{$self->{buckets}}, {
+            count => { %{$b->{count}} },
+            time  => Set::IntSpan->new($b->{time}),
+        };
     }
 }
 
@@ -126,6 +151,8 @@ sub try_push {
     my $count = 1;
     $count = $options{count} if defined $options{count};
 
+    DEBUG "Trying to push $key $time $count";
+
     if($self->{db}) {
         $self->{db}->lock();
         $self->restore();
@@ -137,11 +164,14 @@ sub try_push {
 
     foreach my $b (reverse @{$self->{buckets}}) {
         next unless $b->{time}->member($time);
-        if(defined $b->{count}->{$key} and
-           $b->{count}->{$key} == $self->{max_items}) {
+        $b->{count}->{$key} ||= 0;
+        if($b->{count}->{$key} >= $self->{max_items}) {
+            DEBUG "Not increasing counter $key by $count (already at max)";
             $result = 0;
             last;
         } else {
+            DEBUG "Increasing counter $key by $count ",
+                  "($b->{count}->{$key}|$self->{max_items})";
             $b->{count}->{$key} += $count;
             $result = 1;
             last;
