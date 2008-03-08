@@ -1,5 +1,10 @@
 ######################################################################
 Revision history for Perl extension Data::Throttler
 
+0.02  2008/03/07
+    (ms) Persistent file now only modified on write attempts. This allows 
+         for read attempts without knowing the bucket parameters of a 
+         throttler data file.
+
 0.01  2007/04/08
     (ms) Where it all began.

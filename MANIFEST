@@ -6,4 +6,5 @@ MANIFEST			This list of files
 MANIFEST.SKIP
 README
 t/001Basic.t
+t/002File.t
 Throttler.pm

@@ -7,7 +7,7 @@ use Log::Log4perl qw(:easy);
 use Text::ASCIITable;
 use DBM::Deep;
 
-our $VERSION    = "0.01";
+our $VERSION    = "0.02";
 our $DB_VERSION = "1.0";
 
 ###########################################
@@ -22,12 +22,14 @@ sub new {
     $self->{db_file} = $options{db_file} if defined $options{db_file};
     $self->{lock}    = sub { };
     $self->{unlock}  = sub { };
+    $self->{changed} = 0;
 
     bless $self, $class;
 
     my $create = 1;
 
     if($self->{db_file}) {
+            # persistent store
         if(-f $self->{db_file}) {
             $create = 0;
         }
@@ -42,25 +44,38 @@ sub new {
         if($self->{db}->{chain} and
            ($self->{db}->{chain}->{max_items} != $options{max_items} or
             $self->{db}->{chain}->{interval} != $options{interval})) {
-            ERROR "Bucket chain parameters have changed ",
-                  "(max_items: $self->{db}->{chain}->{max_items}/",
-                  "$options{max_items} ",
-                  "(interval: $self->{db}->{chain}->{interval}/",
-                  "$options{interval})", ", throwing old chain away";
-            $create = 1;
+            $create = 0;
+            $self->{changed} = 1;
+            $self->{options} = \%options;
         }
     }
 
     if($create) {
-        $self->{lock}->();
-        $self->{db}->{chain} = Data::Throttler::BucketChain->new(
-            max_items => $options{max_items},
-            interval  => $options{interval},
-        );
-        $self->{unlock}->();
+        $self->create( \%options );
     }
 
     return $self;
+}
+
+###########################################
+sub create {
+###########################################
+    my($self, $options) = @_;
+
+    if( $self->{changed} ) {
+        ERROR "Bucket chain parameters have changed ",
+              "(max_items: $self->{db}->{chain}->{max_items}/",
+              "$options->{max_items} ",
+              "(interval: $self->{db}->{chain}->{interval}/",
+              "$options->{interval})", ", throwing old chain away";
+    }
+
+    $self->{lock}->();
+    $self->{db}->{chain} = Data::Throttler::BucketChain->new(
+            max_items => $options->{max_items},
+            interval  => $options->{interval},
+            );
+    $self->{unlock}->();
 }
 
 ###########################################
@@ -81,6 +96,12 @@ sub unlock {
 sub try_push {
 ###########################################
     my($self, %options) = @_;
+
+    if($self->{changed}) {
+        $self->create( $self->{options} );
+        $self->{changed} = 0;
+    }
+
     $self->lock();
     my $ret = $self->{db}->{chain}->try_push(%options);
     $self->unlock();
