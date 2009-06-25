@@ -15,17 +15,36 @@ sub new {
     my($class, %options) = @_;
 
     my $self = {
-        db_version => $DB_VERSION,
+        db_version      => $DB_VERSION,
+        backend         => "Memory",
+        backend_options => {},
+        %options,
     };
 
-    $self->{db_file} = $options{db_file} if defined $options{db_file};
-    $self->{lock}    = sub { };
-    $self->{unlock}  = sub { };
+    if($self->{db_file}) {
+        # legacy option, translate
+        $self->{backend_options} = {
+            db_file => $self->{db_file},
+        };
+        $self->{storage} = "DBMDeep";
+    }
+
+    my $backend_class = "Data::Throttler::Backend::$self->{backend}";
+
+    $self->{backend} = $backend_class->new( 
+            %{ $self->{backend_options} } );
+
     $self->{changed} = 0;
 
     bless $self, $class;
 
-    my $create = 1;
+    if( $self->{ backend }->exists() ) {
+        DEBUG "Backend store exists";
+    } else {
+        DEBUG "Backend store doesn't exist, creating";
+        $self->{ backend }->create() or
+            LOGDIE "Creating backend store failed";
+    }
 
     if($self->{db_file}) {
             # persistent store
@@ -450,8 +469,11 @@ sub new {
     };
 
     bless $self, $class;
+    $self->init();
 }
 
+sub exists { 1 }
+sub create { # can be a noop }
 sub save   { # can be a noop }
 sub load   { # can be a noop }
 sub init   { # can be a noop }
@@ -497,31 +519,50 @@ use base Data::Throttler::Backend::Base;
 ###########################################
 sub init {
 ###########################################
+    my($self) = @_;
+
     require DBM::Deep;
+
+    $self->{db} = DBM::Deep->new(
+        file      => $self->{db_file},
+        autoflush => 1,
+        locking   => 1,
+    );
+}
+
+###########################################
+sub exists {
+###########################################
+    my($self) = @_;
+    return -f $self->{db_file};
 }
 
 ###########################################
 sub save {
 ###########################################
-    # noop
+    my($self, $data) = @_;
+    $self->{db}->{data} = $data;
 }
 
 ###########################################
 sub load {
 ###########################################
-    # noop
+    my($self) = @_;
+    return $self->{db}->{data};
 }
 
 ###########################################
 sub lock {
 ###########################################
-    # noop
+    my($self) = @_;
+    $self->{db}->lock();
 }
 
 ###########################################
 sub unlock {
 ###########################################
-    # noop
+    my($self) = @_;
+    $self->{db}->unlock();
 }
 
 1;
