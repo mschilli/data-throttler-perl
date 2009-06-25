@@ -26,50 +26,43 @@ sub new {
         $self->{backend_options} = {
             db_file => $self->{db_file},
         };
-        $self->{storage} = "DBMDeep";
+        $self->{backend} = "DBMDeep";
     }
 
     my $backend_class = "Data::Throttler::Backend::$self->{backend}";
 
-    $self->{backend} = $backend_class->new( 
+    $self->{db} = $backend_class->new( 
             %{ $self->{backend_options} } );
 
     $self->{changed} = 0;
 
     bless $self, $class;
 
-    if( $self->{ backend }->exists() ) {
+    my $create = 1;
+
+    if( $self->{ db }->exists() ) {
         DEBUG "Backend store exists";
-    } else {
-        DEBUG "Backend store doesn't exist, creating";
-        $self->{ backend }->create() or
-            LOGDIE "Creating backend store failed";
-    }
+        $self->{data} = $self->load();
 
-    if($self->{db_file}) {
-            # persistent store
-        if(-f $self->{db_file}) {
-            $create = 0;
+        if($self->{data}->{chain} and
+           ($self->{data}->{chain}->{max_items} != $options{max_items} or
+            $self->{data}->{chain}->{interval} != $options{interval})) {
+            $create = 1;
         }
-        $self->{db} = DBM::Deep->new(
-            file      => $self->{db_file},
-            autoflush => 1,
-            locking   => 1,
-        );
-        $self->{lock}   = sub { $self->{db}->lock() };
-        $self->{unlock} = sub { $self->{db}->unlock() };
 
-        if($self->{db}->{chain} and
-           ($self->{db}->{chain}->{max_items} != $options{max_items} or
-            $self->{db}->{chain}->{interval} != $options{interval})) {
-            $create = 0;
-            $self->{changed} = 1;
-            $self->{options} = \%options;
-        }
-    }
-
+        $create = 0;
+    } 
+    
     if($create) {
-        $self->create( \%options );
+        $self->{ db }->create() or
+            LOGDIE "Creating backend store failed";
+
+        $self->{data} = { 
+            max_items => $options{max_items},
+            interval  => $options{interval},
+        };
+
+        $self->{db}->store( $self->{data} );
     }
 
     return $self;
