@@ -42,7 +42,7 @@ sub new {
 
     if( $self->{ db }->exists() ) {
         DEBUG "Backend store exists";
-        $self->{data} = $self->load();
+        $self->{data} = $self->{ db }->load();
 
         if($self->{data}->{chain} and
            ($self->{data}->{chain}->{max_items} != $options{max_items} or
@@ -93,14 +93,14 @@ sub create {
 sub lock {
 ###########################################
     my($self) = @_;
-    $self->{lock}->();
+    $self->{db}->lock();
 }
 
 ###########################################
 sub unlock {
 ###########################################
     my($self) = @_;
-    $self->{unlock}->();
+    $self->{db}->unlock->();
 }
 
 ###########################################
@@ -463,26 +463,27 @@ sub new {
 
     bless $self, $class;
     $self->init();
+    return $self;
 }
 
 sub exists { 1 }
-sub create { # can be a noop }
-sub save   { # can be a noop }
-sub load   { # can be a noop }
-sub init   { # can be a noop }
-sub lock   { # can be a noop }
-sub unlock { # can be a noop }
+sub create { }
+sub save   { }
+sub load   { }
+sub init   { }
+sub lock   { }
+sub unlock { }
 
 ###########################################
 package Data::Throttler::Backend::Memory;
 ###########################################
-use base Data::Throttler::Backend::Base;
+use base 'Data::Throttler::Backend::Base';
 # all noops
 
 ###########################################
 package Data::Throttler::Backend::YAML;
 ###########################################
-use base Data::Throttler::Backend::Base;
+use base 'Data::Throttler::Backend::Base';
 
 ###########################################
 sub save {
@@ -507,7 +508,7 @@ sub unlock {
 ###########################################
 package Data::Throttler::Backend::DBMDeep;
 ###########################################
-use base Data::Throttler::Backend::Base;
+use base 'Data::Throttler::Backend::Base';
 
 ###########################################
 sub init {
