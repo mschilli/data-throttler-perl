@@ -17,6 +17,7 @@ sub new {
 
     my $self = {
         db_version => $DB_VERSION,
+        time_func  => \&time_now,
     };
 
     $self->{db_file} = $options{db_file} if defined $options{db_file};
@@ -58,6 +59,12 @@ sub new {
 }
 
 ###########################################
+sub time_now {
+###########################################
+    return time();
+}
+
+###########################################
 sub create {
 ###########################################
     my($self, $options) = @_;
@@ -74,6 +81,7 @@ sub create {
     $self->{db}->{chain} = Data::Throttler::BucketChain->new(
             max_items => $options->{max_items},
             interval  => $options->{interval},
+            time_func => $self->{time_func},
             );
     $self->{unlock}->();
 }
@@ -176,6 +184,7 @@ sub new {
     my $self = {
         max_items => undef,
         interval  => undef,
+        time_func => \&Data::Throttler::time_now,
         %options,
     };
 
@@ -211,7 +220,7 @@ sub reset {
 
     $self->{bucket_time_span} = $bucket_time_span;
 
-    my $time_start = time() -
+    my $time_start = $self->{time_func}->() -
         ($self->{nof_buckets}-1) * $bucket_time_span;
 
     for(1..$self->{nof_buckets}) {
@@ -329,7 +338,10 @@ sub bucket_add {
 sub rotate {
 ###########################################
     my($self, $time) = @_;
-    $time = time() unless defined $time;
+
+    if(!defined $time) {
+        $time = $self->{time_func}->();
+    }
 
     # If the last bucket handles a time interval that doesn't cover
     # $time, we need to rotate the bucket brigade. The first bucket
@@ -401,7 +413,7 @@ sub try_push {
     my $key = "_default";
     $key = $options{key} if defined $options{key};
 
-    my $time = time();
+    my $time = $self->{time_func}->();
     $time = $options{time} if defined $options{time};
 
     my $count = 1;
