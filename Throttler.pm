@@ -62,7 +62,7 @@ sub new {
             interval  => $options{interval},
         };
 
-        $self->{db}->store( $self->{data} );
+        $self->{db}->save( $self->{data} );
     }
 
     return $self;
@@ -75,14 +75,14 @@ sub create {
 
     if( $self->{changed} ) {
         ERROR "Bucket chain parameters have changed ",
-              "(max_items: $self->{db}->{chain}->{max_items}/",
+              "(max_items: $self->{data}->{chain}->{max_items}/",
               "$options->{max_items} ",
-              "(interval: $self->{db}->{chain}->{interval}/",
+              "(interval: $self->{data}->{chain}->{interval}/",
               "$options->{interval})", ", throwing old chain away";
     }
 
     $self->{lock}->();
-    $self->{db}->{chain} = Data::Throttler::BucketChain->new(
+    $self->{data}->{chain} = Data::Throttler::BucketChain->new(
             max_items => $options->{max_items},
             interval  => $options->{interval},
             );
@@ -114,7 +114,7 @@ sub try_push {
     }
 
     $self->lock();
-    my $ret = $self->{db}->{chain}->try_push(%options);
+    my $ret = $self->{data}->{chain}->try_push(%options);
     $self->unlock();
     return $ret;
 }
@@ -124,7 +124,7 @@ sub buckets_dump {
 ###########################################
     my($self) = @_;
     $self->lock();
-    my $ret = $self->{db}->{chain}->as_string();
+    my $ret = $self->{data}->{chain}->as_string();
     $self->unlock();
     return $ret;
 }
@@ -466,8 +466,8 @@ sub new {
     return $self;
 }
 
-sub exists { 1 }
-sub create { }
+sub exists { 0 }
+sub create { 1 }
 sub save   { }
 sub load   { }
 sub init   { }
@@ -478,7 +478,20 @@ sub unlock { }
 package Data::Throttler::Backend::Memory;
 ###########################################
 use base 'Data::Throttler::Backend::Base';
-# all noops
+
+###########################################
+sub save {
+###########################################
+    my($self, $data) = @_;
+    $self->{data} = $data;
+}
+
+###########################################
+sub load {
+###########################################
+    my($self) = @_;
+    return $self->{data};
+}
 
 ###########################################
 package Data::Throttler::Backend::YAML;
