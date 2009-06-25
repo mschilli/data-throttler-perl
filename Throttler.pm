@@ -47,6 +47,7 @@ sub new {
         if($self->{data}->{chain} and
            ($self->{data}->{chain}->{max_items} != $options{max_items} or
             $self->{data}->{chain}->{interval} != $options{interval})) {
+            $self->{changed} = 1;
             $create = 1;
         }
 
@@ -61,6 +62,9 @@ sub new {
             max_items => $options{max_items},
             interval  => $options{interval},
         };
+
+          # create bucket chain
+        $self->create( $self->{data} );
 
         $self->{db}->save( $self->{data} );
     }
@@ -81,12 +85,12 @@ sub create {
               "$options->{interval})", ", throwing old chain away";
     }
 
-    $self->{lock}->();
+    $self->lock();
     $self->{data}->{chain} = Data::Throttler::BucketChain->new(
             max_items => $options->{max_items},
             interval  => $options->{interval},
             );
-    $self->{unlock}->();
+    $self->unlock();
 }
 
 ###########################################
@@ -100,7 +104,7 @@ sub lock {
 sub unlock {
 ###########################################
     my($self) = @_;
-    $self->{db}->unlock->();
+    $self->{db}->unlock();
 }
 
 ###########################################
@@ -133,7 +137,7 @@ sub buckets_dump {
 sub buckets_rotate {
 ###########################################
     my($self) = @_;
-    my $ret = $self->{db}->{chain}->rotate();
+    my $ret = $self->{data}->{chain}->rotate();
     return $ret;
 }
 
@@ -468,8 +472,8 @@ sub new {
 
 sub exists { 0 }
 sub create { 1 }
-sub save   { }
-sub load   { }
+#sub save   { }
+#sub load   { }
 sub init   { }
 sub lock   { }
 sub unlock { }
