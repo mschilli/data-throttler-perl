@@ -44,27 +44,25 @@ sub new {
         DEBUG "Backend store exists";
         $self->{data} = $self->{ db }->load();
 
+        $create = 0;
+
         if($self->{data}->{chain} and
            ($self->{data}->{chain}->{max_items} != $options{max_items} or
             $self->{data}->{chain}->{interval} != $options{interval})) {
             $self->{changed} = 1;
             $create = 1;
         }
-
-        $create = 0;
     } 
     
     if($create) {
         $self->{ db }->create() or
             LOGDIE "Creating backend store failed";
 
-        $self->{data} = { 
+          # create bucket chain
+        $self->create( {
             max_items => $options{max_items},
             interval  => $options{interval},
-        };
-
-          # create bucket chain
-        $self->create( $self->{data} );
+        });
 
         $self->{db}->save( $self->{data} );
     }
@@ -532,9 +530,13 @@ sub init {
 ###########################################
     my($self) = @_;
 
-    $self->{filled} = 0;
-
     require DBM::Deep;
+
+    if(-f $self->{db_file}) {
+        $self->{initialized} = 1;
+    } else {
+        $self->{initialized} = 0;
+    }
 
     $self->{db} = DBM::Deep->new(
         file      => $self->{db_file},
@@ -548,7 +550,7 @@ sub exists {
 ###########################################
     my($self) = @_;
 
-    return $self->{filled} or -f $self->{db_file};
+    return $self->{initialized} or -f $self->{db_file};
 }
 
 ###########################################
@@ -556,7 +558,7 @@ sub save {
 ###########################################
     my($self, $data) = @_;
 
-    $self->{filled} = 1;
+    $self->{initialized} = 1;
     $self->{db}->{data} = $data;
 }
 
