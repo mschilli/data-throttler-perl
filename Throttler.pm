@@ -532,6 +532,8 @@ sub init {
 ###########################################
     my($self) = @_;
 
+    $self->{filled} = 0;
+
     require DBM::Deep;
 
     $self->{db} = DBM::Deep->new(
@@ -545,13 +547,16 @@ sub init {
 sub exists {
 ###########################################
     my($self) = @_;
-    return -f $self->{db_file};
+
+    return $self->{filled} or -f $self->{db_file};
 }
 
 ###########################################
 sub save {
 ###########################################
     my($self, $data) = @_;
+
+    $self->{filled} = 1;
     $self->{db}->{data} = $data;
 }
 
