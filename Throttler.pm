@@ -72,7 +72,7 @@ sub new {
             interval  => $options{interval},
         });
 
-        $self->{db}->save( $self->{data} );
+        $self->{db}->save( $self->data() );
     }
 
     return $self;
@@ -109,6 +109,39 @@ sub create {
 }
 
 ###########################################
+sub freeze {
+###########################################
+    my($self, $data) = @_;
+
+    delete $data->{chain}->{time_func};
+    return $data;
+}
+
+###########################################
+sub thaw {
+###########################################
+    my($self, $data) = @_;
+
+    $data->{chain}->{time_func} = $self->{time_func};
+    return $data;
+}
+
+###########################################
+sub data {
+###########################################
+    my($self, $data) = @_;
+
+    if(defined $data) {
+          # Set internal data structure
+        $self->{data} = $self->thaw( $data );
+        return 1;
+    }
+
+      # Caller wants a serialized version of the internal data
+    return $self->freeze( $self->{ data } );
+}
+
+###########################################
 sub lock {
 ###########################################
     my($self) = @_;
@@ -137,9 +170,9 @@ sub try_push {
 
     $self->lock();
 
-    $self->{data} = $self->{db}->load();
+    $self->data( $self->{db}->load() );
     my $ret = $self->{data}->{chain}->try_push(%options);
-    $self->{db}->save( $self->{data} );
+    $self->{db}->save( $self->data() );
 
     $self->unlock();
     return $ret;
@@ -150,7 +183,7 @@ sub buckets_dump {
 ###########################################
     my($self) = @_;
     $self->lock();
-    $self->{data} = $self->{db}->load();
+    $self->data( $self->{db}->load() );
     my $ret = $self->{data}->{chain}->as_string();
     $self->unlock();
     return $ret;
@@ -414,6 +447,7 @@ sub bucket_find {
 ###########################################
     my($self, $time) = @_;
 
+    LOGCONFESS "Called bucket_find with undefined time" if !defined $time;
     DEBUG "Searching bucket for time=", hms($time);
 
         # Search in the newest bucket first, chances are it's there
