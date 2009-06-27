@@ -26,7 +26,7 @@ sub new {
         $self->{backend_options} = {
             db_file => $self->{db_file},
         };
-        $self->{backend} = "DBMDeep";
+        $self->{backend} = "YAML";
     }
 
     my $backend_class = "Data::Throttler::Backend::$self->{backend}";
@@ -521,7 +521,7 @@ sub unlock {
 }
 
 ###########################################
-package Data::Throttler::Backend::DBMDeep;
+package Data::Throttler::Backend::YAML;
 ###########################################
 use base 'Data::Throttler::Backend::Base';
 
@@ -530,19 +530,7 @@ sub init {
 ###########################################
     my($self) = @_;
 
-    require DBM::Deep;
-
-    if(-f $self->{db_file}) {
-        $self->{initialized} = 1;
-    } else {
-        $self->{initialized} = 0;
-    }
-
-    $self->{db} = DBM::Deep->new(
-        file      => $self->{db_file},
-        autoflush => 1,
-        locking   => 1,
-    );
+    require YAML;
 }
 
 ###########################################
@@ -550,7 +538,7 @@ sub exists {
 ###########################################
     my($self) = @_;
 
-    return $self->{initialized} or -f $self->{db_file};
+    return -f $self->{db_file};
 }
 
 ###########################################
@@ -558,29 +546,27 @@ sub save {
 ###########################################
     my($self, $data) = @_;
 
-    $self->{initialized} = 1;
-    $self->{db}->{data} = $data;
+    YAML::DumpFile( $self->{db_file}, $data );
 }
 
 ###########################################
 sub load {
 ###########################################
     my($self) = @_;
-    return $self->{db}->{data};
+
+    return YAML::LoadFile( $self->{db_file} );
 }
 
 ###########################################
 sub lock {
 ###########################################
     my($self) = @_;
-    $self->{db}->lock();
 }
 
 ###########################################
 sub unlock {
 ###########################################
     my($self) = @_;
-    $self->{db}->unlock();
 }
 
 1;
