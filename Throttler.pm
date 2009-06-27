@@ -43,6 +43,7 @@ sub new {
 
     if( $self->{ db }->exists() ) {
         DEBUG "Backend store exists";
+        $self->lock();
         $self->{data} = $self->{ db }->load();
 
         $create = 0;
@@ -57,7 +58,8 @@ sub new {
         if($options{reset} or !$self->{ db }->backend_store_ok() ) {
             $create = 1;
         }
-    } 
+        $self->unlock();
+    }
     
     if($create) {
         $self->{ db }->create( \%options ) or
@@ -89,18 +91,20 @@ sub create {
         $self->{changed} = 0;
     }
 
-    $self->lock();
+    DEBUG "Creating bucket chain max_items=$options->{max_items} ",
+          "interval=$options->{interval}";
+
     $self->{data}->{chain} = Data::Throttler::BucketChain->new(
             max_items => $options->{max_items},
             interval  => $options->{interval},
             );
-    $self->unlock();
 }
 
 ###########################################
 sub lock {
 ###########################################
     my($self) = @_;
+    DEBUG "Lock on";
     $self->{db}->lock();
 }
 
@@ -108,6 +112,7 @@ sub lock {
 sub unlock {
 ###########################################
     my($self) = @_;
+    DEBUG "Lock off";
     $self->{db}->unlock();
 }
 
@@ -116,8 +121,18 @@ sub try_push {
 ###########################################
     my($self, %options) = @_;
 
+    if(exists $options{key}) {
+        DEBUG "Pushing key $options{key}";
+    } else {
+        DEBUG "Pushing keyless item";
+    }
+
     $self->lock();
+
+    $self->{data} = $self->{db}->load();
     my $ret = $self->{data}->{chain}->try_push(%options);
+    $self->{db}->save( $self->{data} );
+
     $self->unlock();
     return $ret;
 }
@@ -127,6 +142,7 @@ sub buckets_dump {
 ###########################################
     my($self) = @_;
     $self->lock();
+    $self->{data} = $self->{db}->load();
     my $ret = $self->{data}->{chain}->as_string();
     $self->unlock();
     return $ret;
@@ -502,6 +518,7 @@ package Data::Throttler::Backend::YAML;
 ###########################################
 use base 'Data::Throttler::Backend::Base';
 use Log::Log4perl qw(:easy);
+use Fcntl qw(:flock);
 
 ###########################################
 sub init {
@@ -549,6 +566,7 @@ sub save {
 ###########################################
     my($self, $data) = @_;
 
+    DEBUG "Saving YAML file $self->{db_file}";
     YAML::DumpFile( $self->{db_file}, $data );
 }
 
@@ -557,6 +575,7 @@ sub load {
 ###########################################
     my($self) = @_;
 
+    DEBUG "Loading YAML file $self->{db_file}";
     return YAML::LoadFile( $self->{db_file} );
 }
 
@@ -564,12 +583,17 @@ sub load {
 sub lock {
 ###########################################
     my($self) = @_;
+
+    open $self->{fh}, "+<", $self->{db_file} or 
+        LOGDIE "Can't open $self->{db_file} for locking";
+    flock $self->{fh}, LOCK_EX;
 }
 
 ###########################################
 sub unlock {
 ###########################################
     my($self) = @_;
+    flock $self->{fh}, LOCK_UN;
 }
 
 1;
