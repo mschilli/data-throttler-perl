@@ -459,7 +459,7 @@ sub try_push {
     } else {
         DEBUG "Increasing counter $key by $count ",
               "($val|$self->{max_items})";
-        $b->{count}->{$key} = $val + $count;
+        $b->{count}->{$key} += $count;
         return 1;
     }
 
