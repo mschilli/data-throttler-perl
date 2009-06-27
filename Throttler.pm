@@ -18,6 +18,7 @@ sub new {
         db_version      => $DB_VERSION,
         backend         => "Memory",
         backend_options => {},
+        reset           => 0,
         %options,
     };
 
@@ -50,6 +51,10 @@ sub new {
            ($self->{data}->{chain}->{max_items} != $options{max_items} or
             $self->{data}->{chain}->{interval} != $options{interval})) {
             $self->{changed} = 1;
+            $create = 1;
+        }
+
+        if($options{reset} or !$self->{ db }->backend_store_ok() ) {
             $create = 1;
         }
     } 
@@ -471,6 +476,7 @@ sub create { 1 }
 sub init   { }
 sub lock   { }
 sub unlock { }
+sub backend_store_ok { 1 }
 
 ###########################################
 package Data::Throttler::Backend::Memory;
@@ -495,6 +501,7 @@ sub load {
 package Data::Throttler::Backend::YAML;
 ###########################################
 use base 'Data::Throttler::Backend::Base';
+use Log::Log4perl qw(:easy);
 
 ###########################################
 sub init {
@@ -502,6 +509,31 @@ sub init {
     my($self) = @_;
 
     require YAML;
+}
+
+###########################################
+sub backend_store_ok {
+###########################################
+    my($self) = @_;
+
+    # Legacy instances used DBM::Deep, but those data stores will be 
+    # replaced by YAML backends. If we reuse a backend data store, make
+    # sure it's a YAML file and not a DBM::Deep blob.
+    if(! -f $self->{db_file} ) {
+        return 1;
+    }
+
+    eval {
+        $self->load();
+    };
+
+    if($@) {
+        ERROR "$self->{db_file} apparently isn't a YAML file, we'll ",
+              "have to dump it and rebuild the bucket chain in YAML";
+        return 0;
+    }
+
+    return 1;
 }
 
 ###########################################
@@ -570,7 +602,10 @@ Data::Throttler - Limit data throughput
     my $throttler = Data::Throttler->new(
         max_items => 100,
         interval  => 3600,
-        db_file   => "/tmp/mythrottle.dat",
+        backend   => "YAML",
+        backend_options => {
+            db_file => "/tmp/mythrottle.yml",
+        },
     );
 
     if($throttler->try_push(key => "somekey")) {
@@ -602,8 +637,17 @@ throttler, using a persistent database is required:
     my $throttler = Data::Throttler->new(
         max_items => 100,
         interval  => 3600,
-        db_file   => "/tmp/mythrottle.dat",
+        backend   => "YAML",
+        backend_options => {
+            db_file => "/tmp/mythrottle.yml",
+        },
     );
+
+The call above will reuse an existing backend store, given that the
+C<max_items> and C<interval> settings are compatible and leave the
+stored counter bucket chain contained therein intact. To specify that
+the backend store should be rebuilt and all counters be reset, use 
+the C<reset =E<gt> 1> option of the Data::Throttler object constructor.
 
 In the simplest case, C<Data::Throttler> just keeps track of single 
 events. It allows a certain number of events per time frame to succeed
