@@ -10,7 +10,7 @@ WriteMakefile(
         Set::IntSpan     => 0,
         Text::ASCIITable => 0,
         Log::Log4perl    => 1.0,
-        DBM::Deep        => 1.0001,
+        YAML             => 0.62,
     }, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'Throttler.pm',
