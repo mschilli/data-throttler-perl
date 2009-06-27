@@ -4,6 +4,7 @@ Revision history for Perl extension Data::Throttler
 0.03  2009/06/27
     (ms) Replaced DBM::Deep by YAML backend
     (ms) Fixed bug RT47189 (reported by Jools Smyth)
+    (ms) Text::ASCIITable is now optional
 
 0.02  2008/03/07
     (ms) Persistent file now only modified on write attempts. This allows 

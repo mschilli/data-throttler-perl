@@ -57,7 +57,7 @@ $rc = $th->try_push(
         );
 is($rc, 1, "push ok with different key");
 
-my $rc = $th->try_push( 
+$rc = $th->try_push( 
         key  => "wonk1",
         time => time(),
         );

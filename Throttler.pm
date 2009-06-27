@@ -4,7 +4,6 @@ package Data::Throttler;
 use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
-use Text::ASCIITable;
 
 our $VERSION    = "0.03";
 our $DB_VERSION = "1.1";
@@ -196,7 +195,6 @@ sub member {
 package Data::Throttler::BucketChain;
 ###########################################
 use Log::Log4perl qw(:easy);
-use Text::ASCIITable;
 
 ###########################################
 sub new {
@@ -293,6 +291,8 @@ sub next_bucket {
 sub as_string {
 ###########################################
     my($self) = @_;
+
+    require Text::ASCIITable;
 
     my $t = Text::ASCIITable->new();
     $t->setCols("#", "idx", ("Time: " . hms(time)), "Key", "Count");
@@ -774,7 +774,11 @@ time than I<now> when trying to push an item:
 
 Speaking of debugging, there's a utility method C<buckets_dump> which
 returns a string containing a formatted representation of what's in
-each bucket. So the code
+each bucket. It requires the CPAN module Text::ASCIITable, so make sure
+to have it installed before calling the method. The module is not 
+a requirement for Data::Throttler on purpose.
+
+So the code
 
     use Data::Throttler;
     

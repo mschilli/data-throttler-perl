@@ -1,3 +1,4 @@
+.git
 blib
 ^Makefile$
 ^Makefile.old$
