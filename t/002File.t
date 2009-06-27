@@ -10,7 +10,7 @@ use Test::More;
 use Data::Throttler;
 use File::Temp qw(tempfile);
 
-plan tests => 5;
+plan tests => 6;
 
 my($fh, $file) = tempfile();
 unlink $file;
@@ -34,3 +34,4 @@ my $throttler2 = Data::Throttler->new(
 
 is($throttler->try_push(), 0, "3nd item blocked");
 is($throttler2->try_push(), 1, "3nd item in");
+is($throttler2->try_push(), 1, "4th item in");

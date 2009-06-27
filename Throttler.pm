@@ -55,7 +55,7 @@ sub new {
     } 
     
     if($create) {
-        $self->{ db }->create() or
+        $self->{ db }->create( \%options ) or
             LOGDIE "Creating backend store failed";
 
           # create bucket chain
@@ -81,6 +81,7 @@ sub create {
               "$options->{max_items} ",
               "(interval: $self->{data}->{chain}->{interval}/",
               "$options->{interval})", ", throwing old chain away";
+        $self->{changed} = 0;
     }
 
     $self->lock();
@@ -109,11 +110,6 @@ sub unlock {
 sub try_push {
 ###########################################
     my($self, %options) = @_;
-
-    if($self->{changed}) {
-        $self->create( $self->{options} );
-        $self->{changed} = 0;
-    }
 
     $self->lock();
     my $ret = $self->{data}->{chain}->try_push(%options);
@@ -493,31 +489,6 @@ sub load {
 ###########################################
     my($self) = @_;
     return $self->{data};
-}
-
-###########################################
-package Data::Throttler::Backend::YAML;
-###########################################
-use base 'Data::Throttler::Backend::Base';
-
-###########################################
-sub save {
-###########################################
-}
-
-###########################################
-sub load {
-###########################################
-}
-
-###########################################
-sub lock {
-###########################################
-}
-
-###########################################
-sub unlock {
-###########################################
 }
 
 ###########################################
