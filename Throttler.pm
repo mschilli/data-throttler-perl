@@ -6,7 +6,7 @@ use warnings;
 use Log::Log4perl qw(:easy);
 use Text::ASCIITable;
 
-our $VERSION    = "0.02";
+our $VERSION    = "0.03";
 our $DB_VERSION = "1.1";
 
 ###########################################
