@@ -12,6 +12,12 @@ WriteMakefile(
         YAML             => 0.62,
         # (optional) Text::ASCIITable => 0,
     }, # e.g., Module::Name => 1.1
+    META_MERGE          => {
+        resources       => {
+            repository  => 
+              'http://github.com/mschilli/data-throttler-perl',
+        },
+    },
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'Throttler.pm',
        AUTHOR     => 'Mike Schilli <cpan@perlmeister.com>') : ()),
