@@ -1,8 +1,9 @@
 ######################################################################
 Revision history for Perl extension Data::Throttler
 
-0.04  (not yet released)
+0.04  2010/05/01
     (ms) Added github repository link to Makefile.PL
+    (ms) Daniel Westermann-Clark added reset_key() method
 
 0.03  2009/06/27
     (ms) Replaced DBM::Deep by YAML backend

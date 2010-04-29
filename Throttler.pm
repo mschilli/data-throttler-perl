@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
 
-our $VERSION    = "0.03";
+our $VERSION    = "0.04";
 our $DB_VERSION = "1.1";
 
 ###########################################
@@ -137,6 +137,27 @@ sub try_push {
 }
 
 ###########################################
+sub reset_key {
+###########################################
+    my($self, %options) = @_;
+
+    if(exists $options{key}) {
+        DEBUG "Resetting count for $options{key}";
+    } else {
+        DEBUG "Resetting count for keyless item";
+    }
+
+    $self->lock();
+
+    $self->{data} = $self->{db}->load();
+    my $ret = $self->{data}->{chain}->reset_key(%options);
+    $self->{db}->save( $self->{data} );
+
+    $self->unlock();
+    return $ret;
+}
+
+###########################################
 sub buckets_dump {
 ###########################################
     my($self) = @_;
@@ -195,6 +216,8 @@ sub member {
 package Data::Throttler::BucketChain;
 ###########################################
 use Log::Log4perl qw(:easy);
+
+our $DEFAULT_KEY = "_default";
 
 ###########################################
 sub new {
@@ -428,7 +451,7 @@ sub try_push {
 ###########################################
     my($self, %options) = @_;
 
-    my $key = "_default";
+    my $key = $DEFAULT_KEY;
     $key = $options{key} if defined $options{key};
 
     my $time = time();
@@ -465,6 +488,27 @@ sub try_push {
 
     LOGDIE "Time $time is outside of bucket range\n", $self->as_string;
     return undef;
+}
+
+###########################################
+sub reset_key {
+###########################################
+    my ($self, %options) = @_;
+
+    my $key = $DEFAULT_KEY;
+    $key = $options{key} if defined $options{key};
+
+    DEBUG "Resetting $key";
+
+    my $total = 0;
+    for(0..$#{$self->{buckets}}) {
+        if (exists $self->{buckets}->[$_]->{count}->{$key}) {
+            $total += $self->{buckets}->[$_]->{count}->{$key};
+            $self->{buckets}->[$_]->{count}->{$key} = 0;
+        }
+    }
+
+    return $total;
 }
 
 ###########################################
@@ -746,6 +790,15 @@ and
     $throttler->unlock();
 
 to protect the data store against competing applications.
+
+=head2 RESETTING
+
+Sometimes, you may need to reset a specific counter, e.g. if an IP
+address has been unintentionally throttled:
+
+    my $count = $throttler->reset_key(key => "192.168.0.1");
+
+The C<reset_key> method returns the total number of attempts so far.
 
 =head2 ADVANCED USAGE
 

@@ -12,7 +12,7 @@ use File::Temp qw(tempfile);
 #use Log::Log4perl qw(:easy);
 #Log::Log4perl->easy_init($DEBUG);
 
-plan tests => 9;
+plan tests => 12;
 
 my($fh, $file) = tempfile();
 unlink $file;
@@ -55,3 +55,6 @@ my $throttler4 = Data::Throttler->new(
     db_file   => $file,
 );
 is($throttler4->try_push(), 0, "item blocked after reload");
+is($throttler4->reset_key(), 2, "resetting key returned expected value");
+is($throttler4->try_push(), 1, "item allowed after resetting key");
+is($throttler4->reset_key(), 1, "resetting key returned expected value");
