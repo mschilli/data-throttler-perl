@@ -1,5 +1,5 @@
 ######################################################################
-    Data::Throttler 0.03
+    Data::Throttler 0.04
 ######################################################################
 
 NAME
@@ -143,6 +143,14 @@ DESCRIPTION
         $throttler->unlock();
 
     to protect the data store against competing applications.
+
+  RESETTING
+    Sometimes, you may need to reset a specific counter, e.g. if an IP
+    address has been unintentionally throttled:
+
+        my $count = $throttler->reset_key(key => "192.168.0.1");
+
+    The "reset_key" method returns the total number of attempts so far.
 
   ADVANCED USAGE
     By default, "Data::Throttler" will decide on the number of buckets by
