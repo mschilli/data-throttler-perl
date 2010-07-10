@@ -1,6 +1,9 @@
 ######################################################################
 Revision history for Perl extension Data::Throttler
 
+0.05  2010/07/09
+    (ms) Disabling YAML checks if YAML isn't present
+
 0.04  2010/05/01
     (ms) Added github repository link to Makefile.PL
     (ms) Daniel Westermann-Clark added reset_key() method

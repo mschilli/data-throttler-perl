@@ -12,11 +12,20 @@ use File::Temp qw(tempfile);
 #use Log::Log4perl qw(:easy);
 #Log::Log4perl->easy_init($DEBUG);
 
-plan tests => 12;
+my $nof_tests = 12;
+
+plan tests => $nof_tests;
+
+SKIP: {
+  eval 'require YAML';
+  if($@) {
+    skip "No YAML - skipping persistent data checks", $nof_tests;
+    last;
+  }
 
 my($fh, $file) = tempfile();
 unlink $file;
-END { unlink $file };
+END { unlink $file if defined $file };
 
 my $throttler = Data::Throttler->new(
     max_items => 2,
@@ -58,3 +67,5 @@ is($throttler4->try_push(), 0, "item blocked after reload");
 is($throttler4->reset_key(), 2, "resetting key returned expected value");
 is($throttler4->try_push(), 1, "item allowed after resetting key");
 is($throttler4->reset_key(), 1, "resetting key returned expected value");
+
+};
