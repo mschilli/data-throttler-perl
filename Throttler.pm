@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
 
-our $VERSION    = "0.05";
+our $VERSION    = "0.06";
 our $DB_VERSION = "1.1";
 
 ###########################################
@@ -629,7 +629,7 @@ sub lock {
     my($self) = @_;
 
     open $self->{fh}, "+<", $self->{db_file} or 
-        LOGDIE "Can't open $self->{db_file} for locking";
+        LOGDIE "Can't open $self->{db_file} for locking: $!";
     flock $self->{fh}, LOCK_EX;
 }
 
