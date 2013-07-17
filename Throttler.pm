@@ -103,8 +103,9 @@ sub create {
 sub lock {
 ###########################################
     my($self) = @_;
-    DEBUG "Lock on";
+    DEBUG "Trying to get lock ($$)";
     $self->{db}->lock();
+    DEBUG "Lock on ($$)";
 }
 
 ###########################################
