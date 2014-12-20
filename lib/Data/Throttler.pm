@@ -1,6 +1,7 @@
 ###########################################
 package Data::Throttler;
 ###########################################
+use 5.006;
 use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
