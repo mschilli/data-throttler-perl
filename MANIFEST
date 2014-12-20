@@ -10,4 +10,4 @@ README
 t/001Basic.t
 t/002File.t
 t/003Bug.t
-Throttler.pm
+lib/Data/Throttler.pm
