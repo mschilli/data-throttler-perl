@@ -836,7 +836,7 @@ a requirement for Data::Throttler on purpose.
 So the code
 
     use Data::Throttler;
-    
+
     my $throttler = Data::Throttler->new(
         interval  => 3600,
         max_items => 10,
