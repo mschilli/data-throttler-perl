@@ -866,7 +866,7 @@ will print out something like
 
 and allow for further investigation.
 
-=head1 LEGALESE
+=head1 LICENSE AND COPYRIGHT
 
 Copyright 2007 by Mike Schilli, all rights reserved.
 This program is free software, you can redistribute it and/or
