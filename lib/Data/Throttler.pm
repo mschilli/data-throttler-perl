@@ -1,6 +1,7 @@
 ###########################################
 package Data::Throttler;
 ###########################################
+use 5.006;
 use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
@@ -835,7 +836,7 @@ a requirement for Data::Throttler on purpose.
 So the code
 
     use Data::Throttler;
-    
+
     my $throttler = Data::Throttler->new(
         interval  => 3600,
         max_items => 10,
@@ -866,7 +867,20 @@ will print out something like
 
 and allow for further investigation.
 
-=head1 LEGALESE
+=head1 SEE ALSO
+
+L<Data::Valve> - another general-purpose throttling module.
+It claims to be faster than C<Data::Throttler>, and also has Memcached support.
+
+L<Sub::Throttler> - rate limit synchronous and asynchronous function calls.
+
+L<Sub::Throttler::Limit> - a plugin for C<Sub::Throttler> that lets you
+throttle by quantity of some resource(s).
+
+L<Schedule::RateLimiter> - provides a way to "restrict how many times
+a given action may take place within a given time frame".
+
+=head1 LICENSE AND COPYRIGHT
 
 Copyright 2007 by Mike Schilli, all rights reserved.
 This program is free software, you can redistribute it and/or
