@@ -6,6 +6,7 @@ use ExtUtils::MakeMaker;
 
 my $meta_merge = {
     META_MERGE => {
+        license   => [ 'perl_5' ],
         resources => {
             repository  => 'http://github.com/mschilli/data-throttler-perl',
         },
