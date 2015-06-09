@@ -1,5 +1,7 @@
+.travis.yml
 Changes
 eg/example
+eg/forktest
 eg/persist
 LICENSE
 Makefile.PL
