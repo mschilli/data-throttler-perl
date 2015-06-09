@@ -1,6 +1,9 @@
 ######################################################################
 Revision history for Perl extension Data::Throttler
 
+0.07 (2015/06/08)
+    (ms) Chris Kirke added a license and Travis CI integration.
+
 0.06 (2013/05/23)
     (ms) [rt.cpan.org 85325] Added better diagnostics in case locking
          of db_file fails, as suggested by Nigel Horne.
