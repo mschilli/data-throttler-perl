@@ -117,6 +117,17 @@ sub unlock {
 }
 
 ###########################################
+sub current_value {
+###########################################
+    my($self, %options) = @_;
+
+    $self->{data} = $self->{db}->load();
+    my $ret = $self->{data}->{chain}->current_value(%options);
+
+    return $ret;
+}
+
+###########################################
 sub try_push {
 ###########################################
     my($self, %options) = @_;
@@ -448,6 +459,26 @@ sub bucket_find {
 }
 
 ###########################################
+sub current_value {
+###########################################
+    my($self, %options) = @_;
+
+    my $key = $DEFAULT_KEY;
+    $key = $options{key} if defined $options{key};
+
+    DEBUG "Getting current value for key=", $key;
+
+    my $val = 0;
+
+    for(0..$#{$self->{buckets}}) {
+        $val += $self->{buckets}->[$_]->{count}->{$key} if
+                exists $self->{buckets}->[$_]->{count}->{$key};
+    }
+
+    return $val;
+}
+
+###########################################
 sub try_push {
 ###########################################
     my($self, %options) = @_;
@@ -461,6 +492,9 @@ sub try_push {
     my $count = 1;
     $count = $options{count} if defined $options{count};
 
+    my $force = 0;
+    $force = $options{force} if defined $options{force};
+
     DEBUG "Trying to push $key ", hms($time), " $count";
 
     my $b = $self->bucket_find($time);
@@ -471,14 +505,16 @@ sub try_push {
     }
 
     # Determine the total count for this key
-    my $val = 0;
-    for(0..$#{$self->{buckets}}) {
-        $val += $self->{buckets}->[$_]->{count}->{$key} if
-                exists $self->{buckets}->[$_]->{count}->{$key};
-    }
+    my $val = $self->current_value(%options);
 
     if($val >= $self->{max_items}) {
-        DEBUG "Not increasing counter $key by $count (already at max)";
+        if ($force) {
+            DEBUG "Increasing (force) counter $key by $count ",
+                  "($val|$self->{max_items})";
+            $b->{count}->{$key} += $count;
+        } else {
+            DEBUG "Not increasing counter $key by $count (already at max)";
+            }
         return 0;
     } else {
         DEBUG "Increasing counter $key by $count ",
@@ -728,6 +764,16 @@ and it recommends to block the rest:
         print "Item needs to wait\n";
     }
 
+the C<force =E<gt> 1> option of the try_push() method will cause the
+counter to be incremented regardless of threshold for use in scenarios
+where max_items is a threshold rather than throttle condition:
+
+    if($throttler->try_push('force' => 1)) {
+        print "Item can be pushed\n";
+    } else {
+        print "Counter incremented, Item needs to wait\n";
+    }
+
 When throttling different categories of items, like attempts to send
 emails by IP address of the sender, a key can be used:
 
@@ -825,6 +871,11 @@ time than I<now> when trying to push an item:
           time => time() - 600 )) {
         print "Item can be pushed in the past\n";
     }
+
+Also for debugging and testing purposes, you can obtain the current
+value of an item:
+
+    my $val = $throttler->current_value(key => "somekey");
 
 Speaking of debugging, there's a utility method C<buckets_dump> which
 returns a string containing a formatted representation of what's in
