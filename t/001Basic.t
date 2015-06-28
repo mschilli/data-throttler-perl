@@ -9,7 +9,7 @@ use strict;
 use Test::More;
 use Data::Throttler;
 
-plan tests => 12;
+plan tests => 16;
 
 my $throttler = Data::Throttler->new(
     max_items => 2,
@@ -38,3 +38,9 @@ $throttler->try_push() for (1..3);
 is($throttler->try_push(), 0, "rejected before sleep");
 sleep(2);
 is($throttler->try_push(), 1, "1st item after sleep");
+
+$throttler->try_push() for (1..3);
+is($throttler->try_push( 'force' => 0 ), 0, 'no force = reject/no increment');
+is($throttler->current_value(), 2, 'before force');
+is($throttler->try_push( 'force' => 1 ), 0, 'force = reject/increment');
+is($throttler->current_value(), 3, 'confirm increment');
