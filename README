@@ -1,5 +1,5 @@
 ######################################################################
-    Data::Throttler 0.07
+    Data::Throttler 0.08
 ######################################################################
 
 NAME
@@ -80,6 +80,16 @@ DESCRIPTION
             print "Item can be pushed\n";
         } else {
             print "Item needs to wait\n";
+        }
+
+    the "force => 1" option of the try_push() method will cause the counter
+    to be incremented regardless of threshold for use in scenarios where
+    max_items is a threshold rather than throttle condition:
+
+        if($throttler->try_push('force' => 1)) {
+            print "Item can be pushed\n";
+        } else {
+            print "Counter incremented, Item needs to wait\n";
         }
 
     When throttling different categories of items, like attempts to send
@@ -175,6 +185,11 @@ DESCRIPTION
               time => time() - 600 )) {
             print "Item can be pushed in the past\n";
         }
+
+    Also for debugging and testing purposes, you can obtain the current
+    value of an item:
+
+        my $val = $throttler->current_value(key => "somekey");
 
     Speaking of debugging, there's a utility method "buckets_dump" which
     returns a string containing a formatted representation of what's in each

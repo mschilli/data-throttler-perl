@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
 
-our $VERSION    = "0.07";
+our $VERSION    = "0.08";
 our $DB_VERSION = "1.1";
 
 ###########################################
@@ -514,7 +514,7 @@ sub try_push {
             $b->{count}->{$key} += $count;
         } else {
             DEBUG "Not increasing counter $key by $count (already at max)";
-            }
+        }
         return 0;
     } else {
         DEBUG "Increasing counter $key by $count ",
