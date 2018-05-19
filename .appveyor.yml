@@ -1,0 +1,21 @@
+---
+clone_folder: C:\projects\data-throttler-perl
+
+cache:
+  - C:\strawberry
+  - C:\cygwin
+
+environment:
+  matrix:
+    - perl_type: cygwin
+    - perl_type: strawberry
+
+install:
+  - 'call .appveyor.cmd perl_setup'
+  - '%perl% -V'
+  - '%cpanm% --installdeps --notest .'
+
+build: off
+
+test_script:
+  - 'prove -lv t'
