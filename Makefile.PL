@@ -14,7 +14,7 @@ my $meta_merge = {
 };
 WriteMakefile(
     'NAME'         => 'Data::Throttler',
-    'VERSION_FROM' => 'Throttler.pm', # finds $VERSION
+    'VERSION_FROM' => 'lib/Data/Throttler.pm', # finds $VERSION
     'PREREQ_PM'    => {
         Set::IntSpan     => 0,
         Log::Log4perl    => 1.0,
@@ -23,6 +23,6 @@ WriteMakefile(
     }, # e.g., Module::Name => 1.1
     $ExtUtils::MakeMaker::VERSION >= 6.50 ? (%$meta_merge) : (),
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
-      (ABSTRACT_FROM => 'Throttler.pm',
+      (ABSTRACT_FROM => 'lib/Data/Throttler.pm',
        AUTHOR     => 'Mike Schilli <cpan@perlmeister.com>') : ()),
 );
