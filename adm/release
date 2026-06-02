@@ -1,10 +1,15 @@
 #!/usr/bin/perl
 use warnings;
 use strict;
+use Module::Release;
 
-    # Available at http://perlmeister.com/scripts
-use ModDevUtils;
+my $release = Module::Release->new();
 
-ModDevUtils::release() or exit 0;
+$release->clean();
+$release->build_makefile();
+$release->make();
+$release->test();
+$release->disttest();
 
-my $ball = ModDevUtils::tarball_name();
+unlink glob("Data-Throttler-*.tar*");
+$release->dist();

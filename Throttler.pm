@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
 
-our $VERSION    = "0.08";
+our $VERSION    = "0.09";
 our $DB_VERSION = "1.1";
 
 ###########################################
